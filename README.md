@@ -8,7 +8,7 @@ Turn any website into a desktop app.
 go run ./cmd/web2desktop https://example.com --name Example
 ```
 
-The build creates an `.app` and `.dmg` in `./dist/darwin-arm64` or `./dist/darwin-amd64`.
+The build writes its files to `./dist/<platform>`.
 
 ## Examples
 
@@ -29,11 +29,21 @@ go run ./cmd/web2desktop https://example.com \
   --output ./build
 ```
 
-Open the generated app:
+Open the generated app on macOS:
 
 ```sh
 open ./dist/darwin-$(go env GOARCH)/Example.app
 ```
+
+Build for Windows and Linux:
+
+```sh
+go run ./cmd/web2desktop https://example.com \
+  --name Example \
+  --platform windows/amd64,linux/amd64
+```
+
+This creates a Windows executable in `./dist/windows-amd64`, and a Linux executable, installer archive, and Debian package in `./dist/linux-amd64`. Install NSIS on the build machine to also create the Windows installer.
 
 Check that the local build requirements are available:
 
@@ -51,6 +61,7 @@ go run ./cmd/web2desktop doctor
 --height        initial window height (default: 800)
 --icon          square PNG icon
 --output        artifact directory (default: ./dist)
+--platform      comma-separated targets, for example windows/amd64,linux/amd64
 --dev           launch in development mode
 --verbose        show build output
 --keep-workdir  retain the generated project

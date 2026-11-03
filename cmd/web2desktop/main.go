@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/web2desktop/web2desktop/internal/builder"
@@ -31,12 +32,13 @@ func run(args []string) int {
 	fs := flag.NewFlagSet("web2desktop", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	name := fs.String("name", "", "application display name")
-	identifier := fs.String("identifier", "", "macOS bundle identifier")
+	identifier := fs.String("identifier", "", "application bundle identifier")
 	appVersion := fs.String("app-version", config.DefaultVersion, "generated application version")
 	width := fs.Int("width", 1200, "initial window width")
 	height := fs.Int("height", 800, "initial window height")
 	icon := fs.String("icon", "", "square PNG application icon")
 	output := fs.String("output", "./dist", "artifact output directory")
+	platform := fs.String("platform", runtime.GOOS+"/"+runtime.GOARCH, "comma-separated build targets")
 	dev := fs.Bool("dev", false, "launch a development app with inspector")
 	verbose := fs.Bool("verbose", false, "show build output")
 	keep := fs.Bool("keep-workdir", false, "keep generated project")
@@ -67,9 +69,14 @@ func run(args []string) int {
 		fmt.Fprintln(os.Stderr, "invalid configuration:", err)
 		return 1
 	}
-	if *dev && runtime.GOOS != "darwin" {
-		fmt.Fprintln(os.Stderr, "development mode currently supports macOS only")
-		return 2
+	platforms, err := builder.ParsePlatforms(*platform)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "invalid platform:", err)
+		return 1
+	}
+	if *dev && (len(platforms) != 1 || platforms[0].String() != runtime.GOOS+"/"+runtime.GOARCH) {
+		fmt.Fprintln(os.Stderr, "development mode only supports the current platform")
+		return 1
 	}
 	workdir, err := os.MkdirTemp("", "web2desktop-")
 	if err != nil {
@@ -106,8 +113,7 @@ func run(args []string) int {
 		return 0
 	}
 	started := time.Now()
-	platformOutput := filepath.Join(c.Output, "darwin-"+runtime.GOARCH)
-	artifacts, err := builder.Build(workdir, platformOutput, c.Name, c.Version, c.Verbose)
+	artifacts, err := builder.Build(workdir, c.Output, platforms, c.Verbose)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "build:", err)
 		return 3
@@ -116,9 +122,17 @@ func run(args []string) int {
 		size := pathSize(path)
 		fmt.Printf("created %s (%s)\n", path, humanSize(size))
 	}
-	fmt.Printf("platform: darwin-%s; elapsed: %s\n", runtime.GOARCH, time.Since(started).Round(time.Second))
+	fmt.Printf("platforms: %s; elapsed: %s\n", strings.Join(platformNames(platforms), ", "), time.Since(started).Round(time.Second))
 	failed = false
 	return 0
+}
+
+func platformNames(platforms []builder.Platform) []string {
+	names := make([]string, len(platforms))
+	for i, platform := range platforms {
+		names[i] = platform.Directory()
+	}
+	return names
 }
 
 func pathSize(path string) int64 {
