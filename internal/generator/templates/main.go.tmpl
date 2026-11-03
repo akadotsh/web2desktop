@@ -1,0 +1,14 @@
+package main
+
+import (
+	"log"
+	"github.com/egoist/mygo"
+)
+
+func main() {
+	mygo.App.SetName({{printf "%q" .Name}})
+	mygo.App.WhenReady(func() {
+		mygo.NewWindow(mygo.WindowOptions{Title: {{printf "%q" .Name}}, URL: {{printf "%q" .URL}}, Width: {{.Width}}, Height: {{.Height}}, StateKey: "main", Page: mygo.PageOptions{DevTools: {{if .DevTools}}mygo.DevToolsEnabled{{else}}mygo.DevToolsDisabled{{end}}, SwipeNavigation: true}})
+	})
+	if err := mygo.App.Run(); err != nil { log.Fatal(err) }
+}
