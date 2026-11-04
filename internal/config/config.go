@@ -53,11 +53,11 @@ func (c *Config) Validate() error {
 		return errors.New("height must be between 240 and 10000")
 	}
 	if c.Identifier == "" {
-		slug := Slug(c.Name)
-		if slug == "" {
-			slug = "app"
+		name := strings.ReplaceAll(Slug(c.Name), "-", "")
+		if name == "" {
+			name = "app"
 		}
-		c.Identifier = "com.web2desktop." + slug
+		c.Identifier = "com.web2desktop." + name
 	}
 	if !identifierPattern.MatchString(c.Identifier) {
 		return fmt.Errorf("invalid bundle identifier %q", c.Identifier)

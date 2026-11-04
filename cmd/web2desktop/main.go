@@ -21,7 +21,15 @@ const cliVersion = "0.1.0"
 
 func main() { os.Exit(run(os.Args[1:])) }
 
-func run(args []string) int {
+func run(args []string) int { return runWithMode(args, false) }
+
+func runWithMode(args []string, creatingProject bool) int {
+	if len(args) > 0 && args[0] == "init" {
+		return runWithMode(args[1:], true)
+	}
+	if len(args) > 0 && args[0] == "build" {
+		return runProject(args[1:])
+	}
 	if len(args) == 1 && args[0] == "doctor" {
 		if err := doctor.Run(); err != nil {
 			fmt.Fprintln(os.Stderr, "doctor:", err)
@@ -39,12 +47,13 @@ func run(args []string) int {
 	icon := fs.String("icon", "", "square PNG application icon")
 	output := fs.String("output", "./dist", "artifact output directory")
 	platform := fs.String("platform", runtime.GOOS+"/"+runtime.GOARCH, "comma-separated build targets")
+	projectPath := fs.String("config", "", "project configuration path (init only)")
 	dev := fs.Bool("dev", false, "launch a development app with inspector")
 	verbose := fs.Bool("verbose", false, "show build output")
 	keep := fs.Bool("keep-workdir", false, "keep generated project")
 	showVersion := fs.Bool("version", false, "print CLI version")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: web2desktop <url> [options]\n       web2desktop doctor\n\nOptions:")
+		fmt.Fprintln(fs.Output(), "Usage: web2desktop <url> [options]\n       web2desktop init <url> [options]\n       web2desktop build web2desktop.json\n       web2desktop doctor\n\nOptions:")
 		fs.PrintDefaults()
 	}
 	if len(args) > 0 && args[0] != "--" && (len(args[0]) == 0 || args[0][0] != '-') {
@@ -78,6 +87,49 @@ func run(args []string) int {
 		fmt.Fprintln(os.Stderr, "development mode only supports the current platform")
 		return 1
 	}
+	if !creatingProject && *projectPath != "" {
+		fmt.Fprintln(os.Stderr, "--config is only valid with the init command")
+		return 1
+	}
+	if creatingProject {
+		path := *projectPath
+		if path == "" {
+			path = config.ProjectFileName
+		}
+		if err := config.WriteProject(path, config.NewProject(c, platformStrings(platforms))); err != nil {
+			fmt.Fprintln(os.Stderr, "create project:", err)
+			return 1
+		}
+		fmt.Printf("created %s\n", path)
+		return 0
+	}
+	return build(c, platforms)
+}
+
+func runProject(args []string) int {
+	if len(args) != 1 {
+		fmt.Fprintln(os.Stderr, "usage: web2desktop build web2desktop.json")
+		return 1
+	}
+	p, err := config.LoadProject(args[0])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "read project:", err)
+		return 1
+	}
+	c := p.BuildConfig()
+	if err := c.Validate(); err != nil {
+		fmt.Fprintln(os.Stderr, "invalid project:", err)
+		return 1
+	}
+	platforms, err := builder.ParsePlatforms(strings.Join(p.Platforms, ","))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "invalid project platform:", err)
+		return 1
+	}
+	return build(c, platforms)
+}
+
+func build(c config.Config, platforms []builder.Platform) int {
 	workdir, err := os.MkdirTemp("", "web2desktop-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -131,6 +183,14 @@ func platformNames(platforms []builder.Platform) []string {
 	names := make([]string, len(platforms))
 	for i, platform := range platforms {
 		names[i] = platform.Directory()
+	}
+	return names
+}
+
+func platformStrings(platforms []builder.Platform) []string {
+	names := make([]string, len(platforms))
+	for i, platform := range platforms {
+		names[i] = platform.String()
 	}
 	return names
 }

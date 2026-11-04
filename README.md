@@ -10,6 +10,15 @@ go run ./cmd/web2desktop https://example.com --name Example
 
 The build writes its files to `./dist/<platform>`.
 
+For a repeatable project, create a configuration file instead:
+
+```sh
+go run ./cmd/web2desktop init example.com --name Example
+go run ./cmd/web2desktop build web2desktop.json
+```
+
+`init` fills in defaults and writes `web2desktop.json`. Edit that file when you want to change the website, icon, window size, version, or platforms. Use the one-line command when you do not need a file.
+
 ## Examples
 
 Create an app from a domain:
@@ -62,6 +71,7 @@ go run ./cmd/web2desktop doctor
 --icon          square PNG icon
 --output        artifact directory (default: ./dist)
 --platform      comma-separated targets, for example windows/amd64,linux/amd64
+--config         configuration file path when using init
 --dev           launch in development mode
 --verbose        show build output
 --keep-workdir  retain the generated project
