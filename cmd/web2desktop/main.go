@@ -17,7 +17,7 @@ import (
 	"github.com/web2desktop/web2desktop/internal/generator"
 )
 
-const cliVersion = "0.1.0"
+var cliVersion = "0.1.0"
 
 func main() { os.Exit(run(os.Args[1:])) }
 
