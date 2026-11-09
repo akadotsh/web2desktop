@@ -1,0 +1,69 @@
+name: Beta release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: darwin, goarch: amd64, archive: tar.gz }
+          - { goos: darwin, goarch: arm64, archive: tar.gz }
+          - { goos: linux, goarch: amd64, archive: tar.gz }
+          - { goos: linux, goarch: arm64, archive: tar.gz }
+          - { goos: windows, goarch: amd64, archive: zip }
+          - { goos: windows, goarch: arm64, archive: zip }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test ./...
+      - name: Build archive
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          ARCHIVE: ${{ matrix.archive }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          name="web2desktop_${VERSION#v}_${GOOS}_${GOARCH}"
+          binary="web2desktop"
+          if [ "$GOOS" = windows ]; then binary="$binary.exe"; fi
+          mkdir -p "$name"
+          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.cliVersion=${VERSION#v}" -o "$name/$binary" ./cmd/web2desktop
+          cp README.md LICENSE "$name/"
+          if [ "$ARCHIVE" = zip ]; then
+            zip -r "$name.zip" "$name"
+          else
+            tar -czf "$name.tar.gz" "$name"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            web2desktop_*.tar.gz
+            web2desktop_*.zip
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          path: release
+          merge-multiple: true
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release/* \
+            --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" \
+            --generate-notes --prerelease
