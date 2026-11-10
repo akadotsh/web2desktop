@@ -3,22 +3,34 @@ package main
 import (
 	"log"
 	"net/url"
+	"strconv"
 	"strings"
 	"github.com/egoist/mygo"
 )
 
 const appURL = {{printf "%q" .URL}}
 
-func sameOrigin(raw string) bool {
-	a, err := url.Parse(appURL)
-	if err != nil { return false }
-	b, err := url.Parse(raw)
-	return err == nil && b.User == nil && (b.Scheme == "http" || b.Scheme == "https") && strings.EqualFold(a.Host, b.Host) && strings.EqualFold(a.Scheme, b.Scheme)
+func originKey(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.User != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" { return "" }
+	scheme, host, port := strings.ToLower(u.Scheme), strings.ToLower(u.Hostname()), u.Port()
+	if port == "" { if scheme == "https" { port = "443" } else { port = "80" } } else if n, err := strconv.Atoi(port); err == nil { port = strconv.Itoa(n) }
+	return scheme + "://" + host + ":" + port
+}
+
+func sameOrigin(raw string) bool { return originKey(raw) != "" && originKey(raw) == originKey(appURL) }
+
+func allowedOrigin(raw string) bool {
+	origin := originKey(raw)
+	if origin == "" { return false }
+	if origin == originKey(appURL) { return true }
+	{{range .AllowedOrigins}}if origin == {{printf "%q" .}} { return true }
+	{{end}}return false
 }
 
 func applyPolicies(page *mygo.Page) {
 	page.OnWillNavigate(func(e *mygo.NavigateEvent) {
-		if sameOrigin(e.URL) { return }
+		if allowedOrigin(e.URL) { return }
 		e.PreventDefault()
 		if e.UserInitiated {
 			if u, err := url.Parse(e.URL); err == nil && u.User == nil && (u.Scheme == "http" || u.Scheme == "https") { go mygo.Shell.OpenExternal(e.URL) }
@@ -26,7 +38,7 @@ func applyPolicies(page *mygo.Page) {
 	})
 	page.SetWindowOpenHandler(func(req mygo.WindowOpenRequest) *mygo.WindowOptions {
 		if !req.UserInitiated { return nil }
-		if sameOrigin(req.URL) { return &mygo.WindowOptions{Title: {{printf "%q" .Name}}, URL: req.URL, Width: {{.Width}}, Height: {{.Height}}, Page: mygo.PageOptions{DevTools: {{if .DevTools}}mygo.DevToolsEnabled{{else}}mygo.DevToolsDisabled{{end}}, SwipeNavigation: true}} }
+		if allowedOrigin(req.URL) { return &mygo.WindowOptions{Title: {{printf "%q" .Name}}, URL: req.URL, Width: {{.Width}}, Height: {{.Height}}, Page: mygo.PageOptions{DevTools: {{if .DevTools}}mygo.DevToolsEnabled{{else}}mygo.DevToolsDisabled{{end}}, SwipeNavigation: true}} }
 		if u, err := url.Parse(req.URL); err == nil && u.User == nil && (u.Scheme == "http" || u.Scheme == "https") { go mygo.Shell.OpenExternal(req.URL) }
 		return nil
 	})

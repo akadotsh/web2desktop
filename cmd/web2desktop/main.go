@@ -54,9 +54,11 @@ func runWithMode(args []string, creatingProject bool) int {
 	verbose := fs.Bool("verbose", false, "show build output")
 	keep := fs.Bool("keep-workdir", false, "keep generated project")
 	permissions := fs.String("allow-permissions", "", "grant website permissions: camera,microphone,geolocation,notifications")
+	origins := fs.String("allow-origin", "", "allow additional http(s) origins to open inside the app")
+	overwrite := fs.Bool("overwrite", false, "replace existing platform artifacts")
 	showVersion := fs.Bool("version", false, "print CLI version")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: web2desktop <url> [options]\n       web2desktop init <url> [options]\n       web2desktop build web2desktop.json\n       web2desktop doctor\n\nOptions:")
+		fmt.Fprintln(fs.Output(), "Usage: web2desktop <url> [options]\n       web2desktop init <url> [options]\n       web2desktop build [--overwrite] web2desktop.json\n       web2desktop doctor\n\nOptions:")
 		fs.PrintDefaults()
 	}
 	if len(args) > 0 && args[0] != "--" && (len(args[0]) == 0 || args[0][0] != '-') {
@@ -76,7 +78,7 @@ func runWithMode(args []string, creatingProject bool) int {
 		fs.Usage()
 		return 1
 	}
-	c := config.Config{URL: fs.Arg(0), Name: *name, Identifier: *identifier, Version: *appVersion, Width: *width, Height: *height, Icon: *icon, Output: *output, Dev: *dev, Verbose: *verbose, KeepWorkdir: *keep, AutoName: *name == "", IdentifierExplicit: *identifier != "", Permissions: splitPermissions(*permissions)}
+	c := config.Config{URL: fs.Arg(0), Name: *name, Identifier: *identifier, Version: *appVersion, Width: *width, Height: *height, Icon: *icon, Output: *output, Dev: *dev, Verbose: *verbose, KeepWorkdir: *keep, AutoName: *name == "", IdentifierExplicit: *identifier != "", Permissions: splitList(*permissions), AllowedOrigins: splitList(*origins), Overwrite: *overwrite}
 	if err := c.Validate(); err != nil {
 		fmt.Fprintln(os.Stderr, "invalid configuration:", err)
 		return 1
@@ -110,16 +112,29 @@ func runWithMode(args []string, creatingProject bool) int {
 }
 
 func runProject(args []string) int {
-	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "usage: web2desktop build web2desktop.json")
+	if len(args) > 0 && args[0] != "--" && (len(args[0]) == 0 || args[0][0] != '-') {
+		args = append(append([]string(nil), args[1:]...), args[0])
+	}
+	fs := flag.NewFlagSet("build", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	overwrite := fs.Bool("overwrite", false, "replace existing platform artifacts")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
 		return 1
 	}
-	p, err := config.LoadProject(args[0])
+	if fs.NArg() != 1 {
+		fmt.Fprintln(os.Stderr, "usage: web2desktop build [--overwrite] web2desktop.json")
+		return 1
+	}
+	p, err := config.LoadProject(fs.Arg(0))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "read project:", err)
 		return 1
 	}
 	c := p.BuildConfig()
+	c.Overwrite = c.Overwrite || *overwrite
 	if err := c.Validate(); err != nil {
 		fmt.Fprintln(os.Stderr, "invalid project:", err)
 		return 1
@@ -167,7 +182,7 @@ func build(c config.Config, platforms []builder.Platform) int {
 			}
 		}
 	}
-	err = generator.Generate(workdir, generator.Options{Name: c.Name, URL: c.URL, Identifier: c.Identifier, Version: c.Version, Description: c.Description, Permissions: c.Permissions, Width: c.Width, Height: c.Height, DevTools: c.Dev}, c.Icon)
+	err = generator.Generate(workdir, generator.Options{Name: c.Name, URL: c.URL, Identifier: c.Identifier, Version: c.Version, Description: c.Description, Permissions: c.Permissions, AllowedOrigins: c.AllowedOrigins, Width: c.Width, Height: c.Height, DevTools: c.Dev}, c.Icon)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "generate:", err)
 		return 1
@@ -187,7 +202,7 @@ func build(c config.Config, platforms []builder.Platform) int {
 		return 0
 	}
 	started := time.Now()
-	artifacts, err := builder.Build(workdir, c.Output, platforms, c.Verbose)
+	artifacts, err := builder.Build(workdir, c.Output, platforms, c.Verbose, c.Overwrite)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "build:", err)
 		return 3
@@ -235,14 +250,14 @@ func humanSize(n int64) string {
 	return fmt.Sprintf("%.1f MB", float64(n)/(1024*1024))
 }
 
-func splitPermissions(raw string) []string {
-	var permissions []string
-	for _, permission := range strings.Split(raw, ",") {
-		if permission = strings.TrimSpace(permission); permission != "" {
-			permissions = append(permissions, permission)
+func splitList(raw string) []string {
+	var values []string
+	for _, value := range strings.Split(raw, ",") {
+		if value = strings.TrimSpace(value); value != "" {
+			values = append(values, value)
 		}
 	}
-	return permissions
+	return values
 }
 
 func execCommand(dir string, args []string, verbose bool) func() error {
