@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/web2desktop/web2desktop/internal/builder"
-	"github.com/web2desktop/web2desktop/internal/config"
-	"github.com/web2desktop/web2desktop/internal/doctor"
-	"github.com/web2desktop/web2desktop/internal/generator"
+	"github.com/akadotsh/web2desktop/internal/builder"
+	"github.com/akadotsh/web2desktop/internal/config"
+	"github.com/akadotsh/web2desktop/internal/doctor"
+	"github.com/akadotsh/web2desktop/internal/generator"
 )
 
 var cliVersion = "0.1.0"

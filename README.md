@@ -7,7 +7,7 @@ Turn any website into a desktop app.
 Requires Go. Install the CLI with:
 
 ```sh
-go install github.com/web2desktop/web2desktop/cmd/web2desktop@latest
+go install github.com/akadotsh/web2desktop/cmd/web2desktop@latest
 ```
 
 Make sure your Go `bin` directory is on your `PATH` to run `web2desktop`.
