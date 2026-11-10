@@ -18,7 +18,7 @@ Make sure your Go `bin` directory is on your `PATH` to run `web2desktop`.
 web2desktop https://example.com --name Example
 ```
 
-The build writes its files to `./dist/<platform>`.
+The CLI reads the website title, description, and a square PNG icon when available. A supplied `--name` or `--icon` takes precedence. The build writes its files to `./dist/<platform>`.
 
 For a repeatable project, create a configuration file instead:
 
@@ -34,13 +34,13 @@ web2desktop build web2desktop.json
 Create an app from a domain:
 
 ```sh
-go run ./cmd/web2desktop example.com --name Example
+web2desktop example.com --name Example
 ```
 
 Set an icon, window size, and output directory:
 
 ```sh
-go run ./cmd/web2desktop https://example.com \
+web2desktop https://example.com \
   --name Example \
   --icon ./icon.png \
   --width 1200 \
@@ -57,7 +57,7 @@ open ./dist/darwin-$(go env GOARCH)/Example.app
 Build for Windows and Linux:
 
 ```sh
-go run ./cmd/web2desktop https://example.com \
+web2desktop https://example.com \
   --name Example \
   --platform windows/amd64,linux/amd64
 ```
@@ -67,7 +67,7 @@ This creates a Windows executable in `./dist/windows-amd64`, and a Linux executa
 Check that the local build requirements are available:
 
 ```sh
-go run ./cmd/web2desktop doctor
+web2desktop doctor
 ```
 
 ## Options
@@ -79,6 +79,7 @@ go run ./cmd/web2desktop doctor
 --width         initial window width (default: 1200)
 --height        initial window height (default: 800)
 --icon          square PNG icon
+--allow-permissions camera,microphone,geolocation,notifications; denied by default
 --output        artifact directory (default: ./dist)
 --platform      comma-separated targets, for example windows/amd64,linux/amd64
 --config         configuration file path when using init
@@ -86,6 +87,8 @@ go run ./cmd/web2desktop doctor
 --verbose        show build output
 --keep-workdir  retain the generated project
 ```
+
+The app keeps navigation on the website's origin, opens user-clicked external links in the system browser, and denies unlisted permissions. Standard edit, reload, zoom, back, and forward shortcuts are available from the app menus.
 
 ## Development
 
