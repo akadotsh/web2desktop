@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/akadotsh/web2desktop/internal/config"
 	"github.com/akadotsh/web2desktop/internal/doctor"
 	"github.com/akadotsh/web2desktop/internal/generator"
+	"github.com/akadotsh/web2desktop/internal/site"
 )
 
 var cliVersion = "0.1.0"
@@ -51,6 +53,7 @@ func runWithMode(args []string, creatingProject bool) int {
 	dev := fs.Bool("dev", false, "launch a development app with inspector")
 	verbose := fs.Bool("verbose", false, "show build output")
 	keep := fs.Bool("keep-workdir", false, "keep generated project")
+	permissions := fs.String("allow-permissions", "", "grant website permissions: camera,microphone,geolocation,notifications")
 	showVersion := fs.Bool("version", false, "print CLI version")
 	fs.Usage = func() {
 		fmt.Fprintln(fs.Output(), "Usage: web2desktop <url> [options]\n       web2desktop init <url> [options]\n       web2desktop build web2desktop.json\n       web2desktop doctor\n\nOptions:")
@@ -73,7 +76,7 @@ func runWithMode(args []string, creatingProject bool) int {
 		fs.Usage()
 		return 1
 	}
-	c := config.Config{URL: fs.Arg(0), Name: *name, Identifier: *identifier, Version: *appVersion, Width: *width, Height: *height, Icon: *icon, Output: *output, Dev: *dev, Verbose: *verbose, KeepWorkdir: *keep}
+	c := config.Config{URL: fs.Arg(0), Name: *name, Identifier: *identifier, Version: *appVersion, Width: *width, Height: *height, Icon: *icon, Output: *output, Dev: *dev, Verbose: *verbose, KeepWorkdir: *keep, AutoName: *name == "", IdentifierExplicit: *identifier != "", Permissions: splitPermissions(*permissions)}
 	if err := c.Validate(); err != nil {
 		fmt.Fprintln(os.Stderr, "invalid configuration:", err)
 		return 1
@@ -145,7 +148,26 @@ func build(c config.Config, platforms []builder.Platform) int {
 			_ = os.RemoveAll(workdir)
 		}
 	}()
-	err = generator.Generate(workdir, generator.Options{Name: c.Name, URL: c.URL, Identifier: c.Identifier, Version: c.Version, Width: c.Width, Height: c.Height, DevTools: c.Dev}, c.Icon)
+	if m, metaErr := site.Fetch(c.URL); metaErr != nil {
+		fmt.Fprintln(os.Stderr, "metadata:", metaErr)
+	} else {
+		if c.AutoName && m.Title != "" {
+			c.Name = m.Title
+			if !c.IdentifierExplicit {
+				c.Identifier = config.Identifier(c.Name)
+			}
+		}
+		c.Description = m.Description
+		if c.Icon == "" && m.IconURL != "" {
+			if icon, err := site.DownloadPNG(m.IconURL); err == nil {
+				iconPath := filepath.Join(workdir, "website-icon.png")
+				if err := os.WriteFile(iconPath, icon, 0600); err == nil {
+					c.Icon = iconPath
+				}
+			}
+		}
+	}
+	err = generator.Generate(workdir, generator.Options{Name: c.Name, URL: c.URL, Identifier: c.Identifier, Version: c.Version, Description: c.Description, Permissions: c.Permissions, Width: c.Width, Height: c.Height, DevTools: c.Dev}, c.Icon)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "generate:", err)
 		return 1
@@ -212,12 +234,42 @@ func humanSize(n int64) string {
 	}
 	return fmt.Sprintf("%.1f MB", float64(n)/(1024*1024))
 }
-func execCommand(dir string, args []string, _ bool) func() error {
+
+func splitPermissions(raw string) []string {
+	var permissions []string
+	for _, permission := range strings.Split(raw, ",") {
+		if permission = strings.TrimSpace(permission); permission != "" {
+			permissions = append(permissions, permission)
+		}
+	}
+	return permissions
+}
+
+func execCommand(dir string, args []string, verbose bool) func() error {
 	return func() error {
 		cmd := exec.Command("go", args...)
 		cmd.Dir = dir
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		return cmd.Run()
+		var logs bytes.Buffer
+		if verbose {
+			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+		} else {
+			cmd.Stdout, cmd.Stderr = &logs, &logs
+		}
+		if err := cmd.Run(); err != nil {
+			message := "go " + strings.Join(args, " ") + " failed: " + err.Error()
+			if logs.Len() > 0 {
+				message += "\n" + tail(logs.String(), 30)
+			}
+			return errors.New(message)
+		}
+		return nil
 	}
+}
+
+func tail(s string, maxLines int) string {
+	lines := strings.Split(strings.TrimSpace(s), "\n")
+	if len(lines) > maxLines {
+		lines = lines[len(lines)-maxLines:]
+	}
+	return strings.Join(lines, "\n")
 }

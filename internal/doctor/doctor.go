@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 )
 
@@ -11,10 +12,13 @@ func Run() error {
 		return fmt.Errorf("Go is not installed or is not on PATH")
 	}
 	fmt.Printf("Go executable: %s\n", goPath)
-	cmd := exec.Command("go", "run", "github.com/egoist/mygo/cmd/mygo@v0.7.4", "--help")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("MyGo v0.7.4 is unavailable: %s", string(out))
+	if out, err := exec.Command("go", "version").CombinedOutput(); err != nil {
+		return fmt.Errorf("cannot run Go (%s): %w", string(out), err)
 	}
-	fmt.Println("MyGo v0.7.4: available")
+	cmd := exec.Command("go", "run", "github.com/egoist/mygo/cmd/mygo@v0.7.4", "doctor")
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("MyGo environment checks failed: %w", err)
+	}
 	return nil
 }

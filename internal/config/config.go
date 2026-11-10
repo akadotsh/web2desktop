@@ -19,8 +19,11 @@ var (
 
 type Config struct {
 	URL, Name, Identifier, Version, Icon, Output string
+	Description                                  string
+	Permissions                                  []string
 	Width, Height                                int
 	Dev, Verbose, KeepWorkdir                    bool
+	AutoName, IdentifierExplicit                 bool
 }
 
 func (c *Config) Validate() error {
@@ -53,11 +56,7 @@ func (c *Config) Validate() error {
 		return errors.New("height must be between 240 and 10000")
 	}
 	if c.Identifier == "" {
-		name := strings.ReplaceAll(Slug(c.Name), "-", "")
-		if name == "" {
-			name = "app"
-		}
-		c.Identifier = "com.web2desktop." + name
+		c.Identifier = Identifier(c.Name)
 	}
 	if !identifierPattern.MatchString(c.Identifier) {
 		return fmt.Errorf("invalid bundle identifier %q", c.Identifier)
@@ -72,7 +71,27 @@ func (c *Config) Validate() error {
 	if c.Output == "" {
 		c.Output = "./dist"
 	}
+	seen := map[string]bool{}
+	for _, permission := range c.Permissions {
+		switch permission {
+		case "camera", "microphone", "geolocation", "notifications":
+		default:
+			return fmt.Errorf("unsupported permission %q", permission)
+		}
+		if seen[permission] {
+			return fmt.Errorf("duplicate permission %q", permission)
+		}
+		seen[permission] = true
+	}
 	return nil
+}
+
+func Identifier(name string) string {
+	name = strings.ReplaceAll(Slug(name), "-", "")
+	if name == "" {
+		name = "app"
+	}
+	return "com.web2desktop." + name
 }
 
 func Slug(s string) string {

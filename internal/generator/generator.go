@@ -14,6 +14,8 @@ var files embed.FS
 
 type Options struct {
 	Name, URL, Identifier, Version string
+	Description                    string
+	Permissions                    []string
 	Width, Height                  int
 	DevTools                       bool
 }
@@ -46,7 +48,20 @@ func Generate(dir string, o Options, icon string) error {
 	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(mod), 0644); err != nil {
 		return err
 	}
-	config := map[string]any{"name": o.Name, "identifier": o.Identifier, "version": o.Version}
+	infoPlist := map[string]string{}
+	for _, permission := range o.Permissions {
+		if permission == "camera" {
+			infoPlist["NSCameraUsageDescription"] = "The website in this app requested camera access."
+		}
+		if permission == "microphone" {
+			infoPlist["NSMicrophoneUsageDescription"] = "The website in this app requested microphone access."
+		}
+	}
+	config := map[string]any{
+		"name": o.Name, "identifier": o.Identifier, "version": o.Version,
+		"linux": map[string]string{"comment": o.Description},
+		"macos": map[string]any{"infoPlist": infoPlist},
+	}
 	b, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return err

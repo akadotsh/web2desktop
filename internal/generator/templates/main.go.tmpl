@@ -2,11 +2,60 @@ package main
 
 import (
 	"log"
+	"net/url"
+	"strings"
 	"github.com/egoist/mygo"
 )
 
+const appURL = {{printf "%q" .URL}}
+
+func sameOrigin(raw string) bool {
+	a, err := url.Parse(appURL)
+	if err != nil { return false }
+	b, err := url.Parse(raw)
+	return err == nil && b.User == nil && (b.Scheme == "http" || b.Scheme == "https") && strings.EqualFold(a.Host, b.Host) && strings.EqualFold(a.Scheme, b.Scheme)
+}
+
+func applyPolicies(page *mygo.Page) {
+	page.OnWillNavigate(func(e *mygo.NavigateEvent) {
+		if sameOrigin(e.URL) { return }
+		e.PreventDefault()
+		if e.UserInitiated {
+			if u, err := url.Parse(e.URL); err == nil && u.User == nil && (u.Scheme == "http" || u.Scheme == "https") { go mygo.Shell.OpenExternal(e.URL) }
+		}
+	})
+	page.SetWindowOpenHandler(func(req mygo.WindowOpenRequest) *mygo.WindowOptions {
+		if !req.UserInitiated { return nil }
+		if sameOrigin(req.URL) { return &mygo.WindowOptions{Title: {{printf "%q" .Name}}, URL: req.URL, Width: {{.Width}}, Height: {{.Height}}, Page: mygo.PageOptions{DevTools: {{if .DevTools}}mygo.DevToolsEnabled{{else}}mygo.DevToolsDisabled{{end}}, SwipeNavigation: true}} }
+		if u, err := url.Parse(req.URL); err == nil && u.User == nil && (u.Scheme == "http" || u.Scheme == "https") { go mygo.Shell.OpenExternal(req.URL) }
+		return nil
+	})
+	allowed := map[mygo.Permission]bool{
+		{{range .Permissions}}mygo.Permission({{printf "%q" .}}): true,
+		{{end}}	}
+	page.SetPermissionHandler(func(req mygo.PermissionRequest) bool {
+		if !sameOrigin(req.Origin) { return false }
+		for _, permission := range req.Permissions { if !allowed[permission] { return false } }
+		return len(req.Permissions) > 0
+	})
+}
+
 func main() {
 	mygo.App.SetName({{printf "%q" .Name}})
+	mygo.App.SetMenu(mygo.NewMenu([]*mygo.MenuItem{
+		{Role: mygo.RoleAppMenu},
+		{Role: mygo.RoleFileMenu},
+		{Role: mygo.RoleEditMenu},
+		{Label: "Navigation", Submenu: []*mygo.MenuItem{
+			{Label: "Back", Accelerator: "Alt+Left", Click: func(_ *mygo.MenuItem, win *mygo.Window) { if win == nil { win = mygo.FocusedWindow() }; if win != nil && win.Page() != nil { win.Page().GoBack() } }},
+			{Label: "Forward", Accelerator: "Alt+Right", Click: func(_ *mygo.MenuItem, win *mygo.Window) { if win == nil { win = mygo.FocusedWindow() }; if win != nil && win.Page() != nil { win.Page().GoForward() } }},
+		}},
+		{Role: mygo.RoleViewMenu},
+		{Role: mygo.RoleWindowMenu},
+	}))
+	mygo.App.OnWindowCreated(func(win *mygo.Window) {
+		if win.Page() != nil { applyPolicies(win.Page()) }
+	})
 	mygo.App.WhenReady(func() {
 		mygo.NewWindow(mygo.WindowOptions{Title: {{printf "%q" .Name}}, URL: {{printf "%q" .URL}}, Width: {{.Width}}, Height: {{.Height}}, StateKey: "main", Page: mygo.PageOptions{DevTools: {{if .DevTools}}mygo.DevToolsEnabled{{else}}mygo.DevToolsDisabled{{end}}, SwipeNavigation: true}})
 	})

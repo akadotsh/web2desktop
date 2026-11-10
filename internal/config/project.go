@@ -8,33 +8,38 @@ import (
 
 // Project is the portable, user-owned build configuration.
 type Project struct {
-	URL        string   `json:"url"`
-	Name       string   `json:"name"`
-	Identifier string   `json:"identifier"`
-	Version    string   `json:"version"`
-	Width      int      `json:"width"`
-	Height     int      `json:"height"`
-	Icon       string   `json:"icon,omitempty"`
-	Platforms  []string `json:"platforms"`
+	URL         string   `json:"url"`
+	Name        string   `json:"name"`
+	Identifier  string   `json:"identifier"`
+	Version     string   `json:"version"`
+	Width       int      `json:"width"`
+	Height      int      `json:"height"`
+	Icon        string   `json:"icon,omitempty"`
+	Platforms   []string `json:"platforms"`
+	Permissions []string `json:"permissions,omitempty"`
+	AutoName    bool     `json:"autoName,omitempty"`
 }
 
 func NewProject(c Config, platforms []string) Project {
 	return Project{
-		URL:        c.URL,
-		Name:       c.Name,
-		Identifier: c.Identifier,
-		Version:    c.Version,
-		Width:      c.Width,
-		Height:     c.Height,
-		Icon:       c.Icon,
-		Platforms:  platforms,
+		URL:         c.URL,
+		Name:        c.Name,
+		Identifier:  c.Identifier,
+		Version:     c.Version,
+		Width:       c.Width,
+		Height:      c.Height,
+		Icon:        c.Icon,
+		Platforms:   platforms,
+		Permissions: c.Permissions,
+		AutoName:    c.AutoName,
 	}
 }
 
 func (p Project) BuildConfig() Config {
 	return Config{
 		URL: p.URL, Name: p.Name, Identifier: p.Identifier, Version: p.Version,
-		Width: p.Width, Height: p.Height, Icon: p.Icon,
+		Width: p.Width, Height: p.Height, Icon: p.Icon, Permissions: p.Permissions,
+		AutoName: p.AutoName, IdentifierExplicit: p.Identifier != "" && p.Identifier != Identifier(p.Name),
 	}
 }
 
