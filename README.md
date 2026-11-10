@@ -29,6 +29,8 @@ web2desktop build web2desktop.json
 
 `init` fills in defaults and writes `web2desktop.json`. Edit that file when you want to change the website, icon, window size, version, or platforms. Use the one-line command when you do not need a file.
 
+Pass `--allow-origin https://login.example` to keep an additional origin inside the app, or `--overwrite` to replace existing artifacts. Both settings can be saved by passing them to `init`.
+
 ## Examples
 
 Create an app from a domain:
@@ -80,15 +82,17 @@ web2desktop doctor
 --height        initial window height (default: 800)
 --icon          square PNG icon
 --allow-permissions camera,microphone,geolocation,notifications; denied by default
+--allow-origin  comma-separated http(s) origins allowed inside the app
 --output        artifact directory (default: ./dist)
 --platform      comma-separated targets, for example windows/amd64,linux/amd64
 --config         configuration file path when using init
+--overwrite     replace existing platform artifact directories
 --dev           launch in development mode
 --verbose        show build output
 --keep-workdir  retain the generated project
 ```
 
-The app keeps navigation on the website's origin, opens user-clicked external links in the system browser, and denies unlisted permissions. Standard edit, reload, zoom, back, and forward shortcuts are available from the app menus.
+The app keeps navigation on the website's origin, opens user-clicked external links in the system browser, and denies unlisted permissions. `--allow-origin` keeps extra web origins in the app without granting them permissions. Standard edit, reload, zoom, back, and forward shortcuts are available from the app menus.
 
 ## Development
 
