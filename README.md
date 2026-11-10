@@ -2,10 +2,20 @@
 
 Turn any website into a desktop app.
 
+## Install
+
+Requires Go. Install the CLI with:
+
+```sh
+go install github.com/web2desktop/web2desktop/cmd/web2desktop@latest
+```
+
+Make sure your Go `bin` directory is on your `PATH` to run `web2desktop`.
+
 ## Quick start
 
 ```sh
-go run ./cmd/web2desktop https://example.com --name Example
+web2desktop https://example.com --name Example
 ```
 
 The build writes its files to `./dist/<platform>`.
@@ -13,8 +23,8 @@ The build writes its files to `./dist/<platform>`.
 For a repeatable project, create a configuration file instead:
 
 ```sh
-go run ./cmd/web2desktop init example.com --name Example
-go run ./cmd/web2desktop build web2desktop.json
+web2desktop init example.com --name Example
+web2desktop build web2desktop.json
 ```
 
 `init` fills in defaults and writes `web2desktop.json`. Edit that file when you want to change the website, icon, window size, version, or platforms. Use the one-line command when you do not need a file.
